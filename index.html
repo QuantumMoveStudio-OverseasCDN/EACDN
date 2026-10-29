@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>𝔼𝔸平台境外 - 官方CDN</title>
+    <style>        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f8;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #2c3e50;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .domain {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #e8f0fe;
+            color: #1a73e8;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 20px;
+            word-break: break-all;
+        }
+        .description {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #555;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 12px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OverseasCDN服务节点</h1>
+        
+        <div class="domain">
+            https://quantummovestudio-overseascdn.github.io/EACDN/
+        </div>
+        
+        <p class="description">
+            此地址是<strong>EastAOpenDo</strong>的官方境外CDN地址。
+        </p>
+        
+        
+        <div class="footer">
+            <p class="copyright">© <span id="year"></span> 𝔼𝔸平台(EastAOpenDo). All rights reserved.</p>
+        </div>
+    </div>
+    
+    <script>
+    (function() {
+    'use strict';
+
+    const CONFIG = {
+        PRIMARY_API: 'https://quantummovestudio.dpdns.org/api/time/server',
+        FALLBACK_APIS: [
+            'https://quan.suning.com/getSysTime.do',
+            'https://api.m.taobao.com/rest/api3.do?api=mtop.common.getTimestamp'
+        ],
+        START_YEAR: 2026,
+        TIMEOUT: 5000
+    };
+
+    var yearEl = document.getElementById("year");
+    if (!yearEl) {
+        console.error('CopyrightYear: 未找到 #year 元素');
+        return;
+    }
+
+    function setYear(currentYear) {
+        if (currentYear === CONFIG.START_YEAR) {
+            yearEl.textContent = CONFIG.START_YEAR;
+        } else if (currentYear > CONFIG.START_YEAR) {
+            yearEl.textContent = CONFIG.START_YEAR + "-" + currentYear;
+        } else {
+            yearEl.textContent = CONFIG.START_YEAR;
+        }
+    }
+
+    function fallbackLocalYear() {
+        console.warn('CopyrightYear: 所有时间源都失败，回退到本地时间');
+        setYear(new Date().getFullYear());
+    }
+
+    function parseSuningResponse(data) {
+        if (data && data.sysTime2) {
+            return parseInt(data.sysTime2.slice(0, 4), 10);
+        }
+        return null;
+    }
+
+    function parseTaobaoResponse(data) {
+        if (data && data.data && data.data.t) {
+            return new Date(Number(data.data.t)).getFullYear();
+        }
+        return null;
+    }
+
+    function parseOwnServerResponse(data) {
+        if (data && data.datetime) {
+            var date = new Date(data.datetime);
+            if (!isNaN(date.getTime())) {
+                return date.getFullYear();
+            }
+        }
+        if (data && data.timestamp) {
+            var date = new Date(data.timestamp * 1000);
+            if (!isNaN(date.getTime())) {
+                return date.getFullYear();
+            }
+        }
+        return null;
+    }
+
+    function fetchWithTimeout(url, options, timeout) {
+        return Promise.race([
+            fetch(url, options),
+            new Promise(function(_, reject) {
+                setTimeout(function() {
+                    reject(new Error('请求超时'));
+                }, timeout);
+            })
+        ]);
+    }
+
+    function fetchOwnServer() {
+        return fetchWithTimeout(CONFIG.PRIMARY_API, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        }, CONFIG.TIMEOUT)
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            var year = parseOwnServerResponse(data);
+            if (year) {
+                console.log('CopyrightYear: 使用量方易动工作室服务器时间', year);
+                return year;
+            }
+            throw new Error('无法解析服务器响应');
+        });
+    }
+
+    function fetchSuning() {
+        return fetchWithTimeout(CONFIG.FALLBACK_APIS[0], {
+            method: 'GET',
+            mode: 'cors'
+        }, CONFIG.TIMEOUT)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            var year = parseSuningResponse(data);
+            if (year) {
+                console.log('CopyrightYear: 使用苏宁时间', year);
+                return year;
+            }
+            throw new Error('苏宁响应解析失败');
+        });
+    }
+
+    function fetchTaobao() {
+        return fetchWithTimeout(CONFIG.FALLBACK_APIS[1], {
+            method: 'GET',
+            mode: 'cors'
+        }, CONFIG.TIMEOUT)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            var year = parseTaobaoResponse(data);
+            if (year) {
+                console.log('CopyrightYear: 使用淘宝时间', year);
+                return year;
+            }
+            throw new Error('淘宝响应解析失败');
+        });
+    }
+
+    function init() {
+        fetchOwnServer()
+            .then(setYear)
+            .catch(function(err) {
+                console.warn('量方易动工作室的服务器失败:', err.message);
+                return fetchSuning();
+            })
+            .then(setYear)
+            .catch(function(err) {
+                console.warn('苏宁失败:', err.message);
+                return fetchTaobao();
+            })
+            .then(setYear)
+            .catch(function(err) {
+                console.warn('淘宝失败:', err.message);
+                fallbackLocalYear();
+            });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+})();
+</script>
+</body>
+</html>
